@@ -44,9 +44,10 @@ def estimate_essential_matrix(pts1, pts2, K):
     E2, mask = cv2.findEssentialMat(pts1, pts2, K, method=cv2.RANSAC, prob=0.999, threshold=1.0)
     return E1, E2, mask.ravel()
 
-def draw_epipolar_lines(img1, img2, pts1, pts2, F):
-    pts1_sample = pts1[:10]
-    pts2_sample = pts2[:10]
+def draw_epipolar_lines(img1, img2, pts1, pts2, F, title = "Draw Epipolar Lines"):
+    random_indices = np.random.choice(len(pts1), size=min(10, len(pts1)), replace=False)
+    pts1_sample = pts1[random_indices]
+    pts2_sample = pts2[random_indices]
     
     lines = cv2.computeCorrespondEpilines(pts1_sample.reshape(-1, 1, 2), 1, F)
     lines = lines.reshape(-1, 3)
@@ -54,15 +55,16 @@ def draw_epipolar_lines(img1, img2, pts1, pts2, F):
     np.random.seed(42)
     img2_display = img2.copy()
     for r, pt1, pt2 in zip(lines, pts1_sample, pts2_sample):
-        color = tuple(np.random.randint(0, 255, 3).tolist())
+        color = tuple(np.random.randint(0, 180, 3).tolist())
         x0, y0 = map(int, [0, -r[2] / r[1]])
         x1, y1 = map(int, [c, -(r[2] + r[0] * c) / r[1]])
-        img2_display = cv2.line(img2_display, (x0, y0), (x1, y1), color, 1)
-        img2_display = cv2.circle(img2_display, tuple(map(int, pt2)), 5, color, -1)
+        img2_display = cv2.line(img2_display, (x0, y0), (x1, y1), color, 3)
+        img2_display = cv2.circle(img2_display, tuple(map(int, pt2)), 15, color, -1)
+        img2_display = cv2.circle(img2_display, tuple(map(int, pt2)), 15, (0, 0, 0), 1)
     
     plt.figure(figsize=(10, 5))
     plt.imshow(cv2.cvtColor(img2_display, cv2.COLOR_BGR2RGB))
-    plt.title("Epipolar Lines")
+    plt.title(title)
     plt.axis('off')
     plt.show()
-     
+    
