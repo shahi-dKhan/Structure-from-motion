@@ -25,23 +25,35 @@ def extract_and_match_features(img1_colored, img2_colored):
     
     good_matches = []
     pts1, pts2 = [], []
-    for m, n in matches:
+    matched_desc1, matched_desc2 = [], []
+    for match in matches:
+        if len(match) < 2:
+            continue
+        m, n = match
         if m.distance < 0.75 * n.distance:
             good_matches.append(m)
             pts1.append(kp1[m.queryIdx].pt)
             pts2.append(kp2[m.trainIdx].pt)
+            matched_desc1.append(desc1[m.queryIdx])
+            matched_desc2.append(desc2[m.trainIdx])
     
     pts1 = np.array(pts1)
     pts2 = np.array(pts2)
-    return img1, img2, kp1, kp2, desc1, desc2, pts1, pts2, good_matches
+    matched_desc1 = np.array(matched_desc1)
+    matched_desc2 = np.array(matched_desc2)
+    return img1, img2, kp1, kp2, desc1, desc2, pts1, pts2, good_matches, matched_desc1, matched_desc2
 
 def estimate_essential_matrix(pts1, pts2, K):
     F1, _ = cv2.findFundamentalMat(pts1, pts2, cv2.FM_8POINT)
+    if F1 is None:
+        raise ValueError("findFundamentalMat returned None — not enough points or degenerate configuration.")
     E1_raw = K.T @ F1 @ K
     U, S, Vt = np.linalg.svd(E1_raw)
     S_rank2 = np.array([S[0], S[1], 0.0])
     E1 = U @ np.diag(S_rank2) @ Vt
     E2, mask = cv2.findEssentialMat(pts1, pts2, K, method=cv2.RANSAC, prob=0.999, threshold=1.0)
+    if E2 is None or mask is None:
+        raise ValueError("findEssentialMat returned None — not enough inliers or degenerate configuration.")
     return E1, E2, mask.ravel()
 
 def draw_epipolar_lines(img1, img2, pts1, pts2, F, title = "Draw Epipolar Lines"):
