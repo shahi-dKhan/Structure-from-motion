@@ -32,7 +32,41 @@ def linear_triangulation(P1, P2, pts1, pts2):
     return np.array(points_3d)
 
 
-def non_linear_refine_pt(X_init, P1, P2, pt1, pt2, iters=10):
+# def non_linear_refine_pt(X_init, P1, P2, pt1, pt2, iters=10):
+#     if X_init.shape[0] == 4:
+#         X = X_init[:3].copy()
+#     else:
+#         X = X_init.copy()
+
+#     for _ in range(iters):
+#         J = []
+#         e = []
+#         for P, pt in [(P1, pt1), (P2, pt2)]:
+#             X_h = np.append(X, 1)
+#             y = P @ X_h
+#             u = y[0] / y[2]
+#             v = y[1] / y[2]
+#             e.extend([u - pt[0], v - pt[1]])
+#             p1 = P[0]
+#             p2 = P[1]
+#             p3 = P[2]
+#             du_dX = (p1[:3] * y[2] - y[0] * p3[:3]) / (y[2]**2)
+#             dv_dX = (p2[:3] * y[2] - y[1] * p3[:3]) / (y[2]**2)
+#             J.append(du_dX)
+#             J.append(dv_dX)
+#         J = np.array(J)
+#         e = np.array(e)
+#         delta_X, *_ = np.linalg.lstsq(J, -e, rcond=None)
+#         X = X + delta_X
+#     return X
+
+def non_linear_refine_pt(X_init, Ps, pts, iters=10):
+    """
+    Refines a 3D point by minimizing reprojection error across N observing views.
+    
+    Ps  : list of 3x4 Projection matrices for each observing camera
+    pts : list of (x,y) 2D pixel coordinates corresponding to the cameras
+    """
     if X_init.shape[0] == 4:
         X = X_init[:3].copy()
     else:
@@ -41,24 +75,42 @@ def non_linear_refine_pt(X_init, P1, P2, pt1, pt2, iters=10):
     for _ in range(iters):
         J = []
         e = []
-        for P, pt in [(P1, pt1), (P2, pt2)]:
+        
+        # Loop dynamically over all observing views
+        for P, pt in zip(Ps, pts):
             X_h = np.append(X, 1)
             y = P @ X_h
+            
+            # Avoid division by zero if the point falls exactly on the camera center
+            if abs(y[2]) < 1e-7: 
+                continue
+                
             u = y[0] / y[2]
             v = y[1] / y[2]
+            
             e.extend([u - pt[0], v - pt[1]])
+            
             p1 = P[0]
             p2 = P[1]
             p3 = P[2]
+            
             du_dX = (p1[:3] * y[2] - y[0] * p3[:3]) / (y[2]**2)
             dv_dX = (p2[:3] * y[2] - y[1] * p3[:3]) / (y[2]**2)
+            
             J.append(du_dX)
             J.append(dv_dX)
+            
+        if len(J) == 0:
+            break
+            
         J = np.array(J)
         e = np.array(e)
+        
         delta_X, *_ = np.linalg.lstsq(J, -e, rcond=None)
         X = X + delta_X
+        
     return X
+
 
 def disambiguate_poses(poses, K, pts1, pts2):
     best_count = 0
