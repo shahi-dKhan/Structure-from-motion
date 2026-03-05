@@ -2,6 +2,7 @@ import numpy as np
 import cv2
 from scipy.optimize import least_squares
 from scipy.sparse import lil_matrix
+from scipy.spatial import KDTree
 
 def build_observations(map_points):
     camera_indices = []
@@ -138,3 +139,20 @@ def run_bundle_adjustment(map_points, camera_poses, K):
         filtered_points[j].X = optimized[pt_offset:pt_offset + 3]
 
     return filtered_points, new_camera_poses
+
+
+
+def normalize_cloud(points):
+    centroid = np.mean(points, axis=0)
+    centered_points = points - centroid
+    scale = np.mean(np.linalg.norm(centered_points, axis=1))
+    normalized_points = centered_points / scale
+    return normalized_points
+
+def compute_chamfer_distance(cloud1, cloud2):
+    tree1 = KDTree(cloud1)
+    tree2 = KDTree(cloud2)
+    dist1, _ = tree2.query(cloud1)
+    dist2, _ = tree1.query(cloud2)
+    return (np.mean(dist1**2) + np.mean(dist2**2)) / 2
+

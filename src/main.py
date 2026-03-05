@@ -7,9 +7,11 @@ from utils.features import get_camera_intrinsics, extract_and_match_features, es
 from utils.triangulation import decompose_essential_matrix, linear_triangulation, non_linear_refine_pt, disambiguate_poses
 from utils.helpers import *
 from utils.increment import *
-from utils.bundle_adjustment import build_observations, pack_parameters, build_jacobian_sparsity, ba_residuals, run_bundle_adjustment
+from utils.bundle_adjustment import build_observations, pack_parameters, build_jacobian_sparsity, ba_residuals, run_bundle_adjustment, normalize_cloud, compute_chamfer_distance
+
 import argparse
 import pickle
+import open3d as o3d
 
 def extract_frames_from_video(video_path, interval=400):
     cap = cv2.VideoCapture(video_path)
@@ -176,13 +178,23 @@ if __name__ == "__main__":
     except StopIteration:
         print("Not enough frames extracted to perform matching.")
         
-    print("\nSaving 3D map and camera poses to disk...")
-    map_data = {
-        "map_points": map_points,
-        "camera_poses": camera_poses,
-        "K": K
-    }
+    # print("\nSaving 3D map and camera poses to disk...")
+    # map_data = {
+    #     "map_points": map_points,
+    #     "camera_poses": camera_poses,
+    #     "K": K
+    # }
 
-    with open("custom_sfm_map.pkl", "wb") as f:
-        pickle.dump(map_data, f)
-    print("Saved successfully to 'custom_sfm_map.pkl'.")
+    # with open("custom_sfm_map.pkl", "wb") as f:
+    #     pickle.dump(map_data, f)
+    # print("Saved successfully to 'custom_sfm_map.pkl'.")
+    gt_path = "../Dataset/GT_ply_files/Truck.ply"
+    gt_mesh = o3d.io.read_point_cloud(gt_path)
+    gt_points = np.asarray(gt_mesh.points)
+    recon_pts = np.array([mp.X for mp in map_points])
+    norm_recon = normalize_cloud(recon_pts)
+    norm_gt = normalize_cloud(gt_points)
+    chamfer_dist = compute_chamfer_distance(norm_recon, norm_gt)
+    print(f"Chamfer Distance to GT: {chamfer_dist:.6f}")
+    
+    
