@@ -11,3 +11,24 @@ def reprojection_error(P, X, pts):
         total += np.linalg.norm([u - pi[0], v - pi[1]])
     return total / len(X)
 
+def extract_frames_from_video(video_path, interval=400):
+    cap = cv2.VideoCapture(video_path)
+    count = 0
+    
+    if not cap.isOpened():
+        print(f"Error: Could not open video at {video_path}")
+        return
+
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break  
+        
+        if count % interval == 0:
+            yield count, frame  # yield (frame_number, frame)
+            
+        count += 1
+        
+    cap.release()
+    
+    

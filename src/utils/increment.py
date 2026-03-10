@@ -1,3 +1,4 @@
+import os
 import cv2
 import numpy as np
 from utils.features import *
@@ -159,22 +160,22 @@ def Expand_map(registered_frames, curr_frame_id, curr_kp, curr_desc,
 
 
 def run_incremental_sfm(frame_stream, K, map_points, camera_poses,
-                        registered_frames, max_frames=6):
-    sift = cv2.SIFT_create()
-    video_frame = len(camera_poses)   # video-frame counter (may skip values)
+                        registered_frames, max_frames=6, cache_dir=None):
     global_used_kps = set()                  # (cam_idx, kp_idx) already in the map
 
-    for img in frame_stream:
+    for frame_num, img in frame_stream:
         if len(camera_poses) >= max_frames:
             break
-        print(f"\nProcessing video frame {video_frame}...")
-        img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        kp, desc = sift.detectAndCompute(img_gray, None)
+        print(f"\nProcessing video frame {frame_num}...")
+        cache_path = (
+            os.path.join(cache_dir, f"frame_{frame_num:06d}")
+            if cache_dir is not None else None
+        )
+        kp, desc = detect_and_compute_cached(img, cache_path)
         cam_idx = len(camera_poses)
         R_new, t_new, curr_used_kps = estimate_pose_pnp(map_points, kp, desc, K, cam_idx)
         if R_new is None:
-            print(f"  Video frame {video_frame}: Pose estimation failed. Skipping.")
-            video_frame += 1
+            print(f"  Video frame {frame_num}: Pose estimation failed. Skipping.")
             continue
 
         camera_poses.append((R_new, t_new))
@@ -192,6 +193,5 @@ def run_incremental_sfm(frame_stream, K, map_points, camera_poses,
 
         # Register this camera so future frames can match against it
         registered_frames.append((cam_idx, kp, desc))
-        video_frame += 1
 
     return map_points, camera_poses

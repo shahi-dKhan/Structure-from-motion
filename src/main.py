@@ -13,27 +13,7 @@ import argparse
 import pickle
 import open3d as o3d
 
-def extract_frames_from_video(video_path, interval=400):
-    cap = cv2.VideoCapture(video_path)
-    count = 0
-    
-    if not cap.isOpened():
-        print(f"Error: Could not open video at {video_path}")
-        return
-
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break  
-        
-        if count % interval == 0:
-            yield frame  # Yield hands the frame back immediately, pausing the loop
-            
-        count += 1
-        
-    cap.release()
-
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--video', type=str, default='../Dataset/Split_A/split_a_truck-004.mp4', help='Path to input video file')
     parser.add_argument('--interval', type=int, default=120, help='Frame extraction interval (in frames)')
@@ -65,12 +45,19 @@ if __name__ == "__main__":
             camera_poses = camera_poses_stored
             K = K_stored
         else:
-            img1_color = next(frame_stream)
+            video_stem = os.path.splitext(os.path.basename(video_file))[0]
+            cache_dir = os.path.join("cache", video_stem)
+
+            frame_num1, img1_color = next(frame_stream)
             K = get_camera_intrinsics(img1_color.shape)
-            img2_color = next(frame_stream)
+            frame_num2, img2_color = next(frame_stream)
             
             print("Matching features...")
-            img1_gray, img2_gray, kp1, kp2, desc1, desc2, pts1, pts2, good_matches, matched_desc1, matched_desc2 = extract_and_match_features(img1_color, img2_color)
+            img1_gray, img2_gray, kp1, kp2, desc1, desc2, pts1, pts2, good_matches, matched_desc1, matched_desc2 = extract_and_match_features(
+                img1_color, img2_color,
+                cache_path1=os.path.join(cache_dir, f"frame_{frame_num1:06d}"),
+                cache_path2=os.path.join(cache_dir, f"frame_{frame_num2:06d}"),
+            )
             
             print("Estimating Essential Matrix...")
             E1, E2, mask = estimate_essential_matrix(pts1, pts2, K)
@@ -130,7 +117,7 @@ if __name__ == "__main__":
             print("Initial 3D points:", len(map_points))
             registered_frames = [(0, kp1, desc1), (1, kp2, desc2)]
 
-            map_points, camera_poses = run_incremental_sfm(frame_stream,K,map_points,camera_poses,registered_frames=registered_frames,max_frames=6)
+            map_points, camera_poses = run_incremental_sfm(frame_stream,K,map_points,camera_poses,registered_frames=registered_frames,max_frames=6,cache_dir=cache_dir)
         
         # =========================
         # ------ FINAL OUTPUT -----
@@ -198,3 +185,7 @@ if __name__ == "__main__":
     print(f"Chamfer Distance to GT: {chamfer_dist:.6f}")
     
     
+
+
+if __name__ == "__main__":
+    main()
